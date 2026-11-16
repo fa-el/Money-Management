@@ -1,0 +1,499 @@
+// Prisma schema — dipetakan ke tabel yang dibuat oleh database/schema.sql.
+// Sumber kebenaran struktur database adalah file SQL tersebut; file ini hanya
+// dipakai untuk menghasilkan Prisma Client (`npx prisma generate`).
+// Jangan jalankan `prisma migrate` / `prisma db push` terhadap database ini.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SpaceType {
+  PERSONAL
+  FAMILY
+  BUSINESS
+
+  @@map("space_type")
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  EDITOR
+  MEMBER
+  VIEWER
+
+  @@map("member_role")
+}
+
+enum MemberStatus {
+  ACTIVE
+  INVITED
+  INACTIVE
+
+  @@map("member_status")
+}
+
+enum AccountType {
+  BANK
+  CASH
+  EWALLET
+
+  @@map("account_type")
+}
+
+enum CategoryType {
+  INCOME
+  EXPENSE
+
+  @@map("category_type")
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+
+  @@map("transaction_type")
+}
+
+enum TransactionStatus {
+  VALID
+  VOID
+
+  @@map("transaction_status")
+}
+
+enum GoalStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+
+  @@map("goal_status")
+}
+
+enum ImportFileStatus {
+  UPLOADED
+  PROCESSING
+  READY
+  ERROR
+
+  @@map("import_file_status")
+}
+
+enum ImportSourceType {
+  RECEIPT
+  E_STATEMENT
+
+  @@map("import_source_type")
+}
+
+enum ImportJobStatus {
+  UPLOADED
+  PROCESSING
+  NEEDS_REVIEW
+  APPROVED
+  IMPORTED
+  FAILED
+
+  @@map("import_job_status")
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  IGNORED
+
+  @@map("review_status")
+}
+
+model User {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String    @db.VarChar(120)
+  email        String    @db.VarChar(255)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy    String?   @map("created_by") @db.Uuid
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy    String?   @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+
+  sessions      Session[]
+  memberships   SpaceMember[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tokenHash String   @unique @map("token_hash") @db.VarChar(128)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model FinanceSpace {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String    @db.VarChar(120)
+  type      SpaceType
+  currency  String    @default("IDR") @db.VarChar(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy String    @map("created_by") @db.Uuid
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy String?   @map("updated_by") @db.Uuid
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy String?   @map("deleted_by") @db.Uuid
+
+  members SpaceMember[]
+
+  @@map("finance_spaces")
+}
+
+model SpaceMember {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  financeSpaceId String       @map("finance_space_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  role           MemberRole
+  status         MemberStatus @default(INVITED)
+  joinedAt       DateTime?    @map("joined_at") @db.Timestamptz(6)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy      String?      @map("created_by") @db.Uuid
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy      String?      @map("updated_by") @db.Uuid
+  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  deletedBy      String?      @map("deleted_by") @db.Uuid
+
+  financeSpace FinanceSpace @relation(fields: [financeSpaceId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@map("space_members")
+}
+
+model Notification {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  financeSpaceId String?   @map("finance_space_id") @db.Uuid
+  title          String    @db.VarChar(200)
+  message        String
+  isRead         Boolean   @default(false) @map("is_read")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy      String?   @map("deleted_by") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+model Account {
+  id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  financeSpaceId     String      @map("finance_space_id") @db.Uuid
+  name               String      @db.VarChar(120)
+  type               AccountType
+  openingBalance     Decimal     @default(0) @map("opening_balance") @db.Decimal(18, 2)
+  openingBalanceDate DateTime    @default(dbgenerated("CURRENT_DATE")) @map("opening_balance_date") @db.Date
+  isActive           Boolean     @default(true) @map("is_active")
+  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy          String      @map("created_by") @db.Uuid
+  updatedAt          DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy          String?     @map("updated_by") @db.Uuid
+  deletedAt          DateTime?   @map("deleted_at") @db.Timestamptz(6)
+  deletedBy          String?     @map("deleted_by") @db.Uuid
+
+  outgoing Transaction[] @relation("TransactionAccount")
+  incoming Transaction[] @relation("TransactionDestination")
+
+  @@unique([id, financeSpaceId], map: "accounts_id_space_uk")
+  @@map("accounts")
+}
+
+model Category {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  financeSpaceId String       @map("finance_space_id") @db.Uuid
+  name           String       @db.VarChar(80)
+  type           CategoryType
+  icon           String?      @db.VarChar(40)
+  color          String?      @db.VarChar(20)
+  isActive       Boolean      @default(true) @map("is_active")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy      String       @map("created_by") @db.Uuid
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy      String?      @map("updated_by") @db.Uuid
+  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  deletedBy      String?      @map("deleted_by") @db.Uuid
+
+  transactions Transaction[]
+  budgets      Budget[]
+
+  @@unique([id, financeSpaceId], map: "categories_id_space_uk")
+  @@map("categories")
+}
+
+model RecurringTransaction {
+  id                   String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  financeSpaceId       String          @map("finance_space_id") @db.Uuid
+  accountId            String          @map("account_id") @db.Uuid
+  destinationAccountId String?         @map("destination_account_id") @db.Uuid
+  categoryId           String?         @map("category_id") @db.Uuid
+  type                 TransactionType
+  amount               Decimal         @db.Decimal(18, 2)
+  description          String?
+  frequency            String          @db.VarChar(10)
+  startDate            DateTime        @map("start_date") @db.Date
+  nextExecutionDate    DateTime        @map("next_execution_date") @db.Date
+  lastExecutionAt      DateTime?       @map("last_execution_at") @db.Timestamptz(6)
+  endDate              DateTime?       @map("end_date") @db.Date
+  isActive             Boolean         @default(true) @map("is_active")
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy            String          @map("created_by") @db.Uuid
+  updatedAt            DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy            String?         @map("updated_by") @db.Uuid
+  deletedAt            DateTime?       @map("deleted_at") @db.Timestamptz(6)
+  deletedBy            String?         @map("deleted_by") @db.Uuid
+
+  @@unique([id, financeSpaceId], map: "recurring_id_space_uk")
+  @@map("recurring_transactions")
+}
+
+model Transaction {
+  id                     String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  financeSpaceId         String            @map("finance_space_id") @db.Uuid
+  accountId              String            @map("account_id") @db.Uuid
+  destinationAccountId   String?           @map("destination_account_id") @db.Uuid
+  categoryId             String?           @map("category_id") @db.Uuid
+  recurringTransactionId String?           @map("recurring_transaction_id") @db.Uuid
+  recurrenceDate         DateTime?         @map("recurrence_date") @db.Date
+  type                   TransactionType
+  amount                 Decimal           @db.Decimal(18, 2)
+  transactionDate        DateTime          @map("transaction_date") @db.Timestamptz(6)
+  description            String?
+  status                 TransactionStatus @default(VALID)
+  createdAt              DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy              String            @map("created_by") @db.Uuid
+  updatedAt              DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy              String?           @map("updated_by") @db.Uuid
+  deletedAt              DateTime?         @map("deleted_at") @db.Timestamptz(6)
+  deletedBy              String?           @map("deleted_by") @db.Uuid
+
+  account            Account   @relation("TransactionAccount", fields: [accountId, financeSpaceId], references: [id, financeSpaceId], onDelete: NoAction, onUpdate: NoAction, map: "transactions_account_fk")
+  destinationAccount Account?  @relation("TransactionDestination", fields: [destinationAccountId, financeSpaceId], references: [id, financeSpaceId], onDelete: NoAction, onUpdate: NoAction, map: "transactions_destination_fk")
+  category           Category? @relation(fields: [categoryId, financeSpaceId], references: [id, financeSpaceId], onDelete: NoAction, onUpdate: NoAction, map: "transactions_category_fk")
+
+  @@unique([id, financeSpaceId], map: "transactions_id_space_uk")
+  @@map("transactions")
+}
+
+model Budget {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  financeSpaceId String    @map("finance_space_id") @db.Uuid
+  categoryId     String    @map("category_id") @db.Uuid
+  period         String    @db.VarChar(10)
+  startDate      DateTime  @map("start_date") @db.Date
+  endDate        DateTime  @map("end_date") @db.Date
+  amount         Decimal   @db.Decimal(18, 2)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy      String    @map("created_by") @db.Uuid
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy      String?   @map("deleted_by") @db.Uuid
+
+  category Category @relation(fields: [categoryId, financeSpaceId], references: [id, financeSpaceId], onDelete: NoAction, onUpdate: NoAction, map: "budgets_category_fk")
+
+  @@map("budgets")
+}
+
+model SavingsGoal {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  financeSpaceId String     @map("finance_space_id") @db.Uuid
+  name           String     @db.VarChar(120)
+  targetAmount   Decimal    @map("target_amount") @db.Decimal(18, 2)
+  targetDate     DateTime?  @map("target_date") @db.Date
+  status         GoalStatus @default(ACTIVE)
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy      String     @map("created_by") @db.Uuid
+  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy      String?    @map("updated_by") @db.Uuid
+  deletedAt      DateTime?  @map("deleted_at") @db.Timestamptz(6)
+  deletedBy      String?    @map("deleted_by") @db.Uuid
+
+  contributions GoalContribution[]
+
+  @@unique([id, financeSpaceId], map: "savings_goals_id_space_uk")
+  @@map("savings_goals")
+}
+
+model GoalContribution {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  financeSpaceId   String    @map("finance_space_id") @db.Uuid
+  goalId           String    @map("goal_id") @db.Uuid
+  accountId        String    @map("account_id") @db.Uuid
+  amount           Decimal   @db.Decimal(18, 2)
+  contributionDate DateTime  @map("contribution_date") @db.Date
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy        String    @map("created_by") @db.Uuid
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy        String?   @map("updated_by") @db.Uuid
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy        String?   @map("deleted_by") @db.Uuid
+
+  goal SavingsGoal @relation(fields: [goalId, financeSpaceId], references: [id, financeSpaceId], onDelete: NoAction, onUpdate: NoAction, map: "goal_contributions_goal_fk")
+
+  @@map("goal_contributions")
+}
+
+model ImportFile {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storageKey   String           @unique @map("storage_key") @db.VarChar(255)
+  originalName String           @map("original_name") @db.VarChar(255)
+  mimeType     String           @map("mime_type") @db.VarChar(120)
+  sizeBytes    BigInt           @map("size_bytes")
+  checksum     String           @db.VarChar(128)
+  status       ImportFileStatus @default(UPLOADED)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy    String           @map("created_by") @db.Uuid
+  updatedAt    DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy    String?          @map("updated_by") @db.Uuid
+  deletedAt    DateTime?        @map("deleted_at") @db.Timestamptz(6)
+  deletedBy    String?          @map("deleted_by") @db.Uuid
+
+  jobs ImportJob[]
+
+  @@map("import_files")
+}
+
+model ImportJob {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  financeSpaceId String           @map("finance_space_id") @db.Uuid
+  accountId      String?          @map("account_id") @db.Uuid
+  sourceType     ImportSourceType @map("source_type")
+  fileId         String           @map("file_id") @db.Uuid
+  status         ImportJobStatus  @default(UPLOADED)
+  errorMessage   String?          @map("error_message")
+  periodStart    DateTime?        @map("period_start") @db.Date
+  periodEnd      DateTime?        @map("period_end") @db.Date
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy      String           @map("created_by") @db.Uuid
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy      String?          @map("updated_by") @db.Uuid
+  deletedAt      DateTime?        @map("deleted_at") @db.Timestamptz(6)
+  deletedBy      String?          @map("deleted_by") @db.Uuid
+
+  file     ImportFile              @relation(fields: [fileId], references: [id])
+  records  ExtractedRecord[]
+  balances BankStatementBalance[]
+
+  @@unique([id, financeSpaceId], map: "import_jobs_id_space_uk")
+  @@map("import_jobs")
+}
+
+model BankStatementBalance {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  financeSpaceId String    @map("finance_space_id") @db.Uuid
+  importJobId    String    @map("import_job_id") @db.Uuid
+  accountId      String    @map("account_id") @db.Uuid
+  openingBalance Decimal?  @map("opening_balance") @db.Decimal(18, 2)
+  endingBalance  Decimal?  @map("ending_balance") @db.Decimal(18, 2)
+  totalDebit     Decimal?  @map("total_debit") @db.Decimal(18, 2)
+  totalCredit    Decimal?  @map("total_credit") @db.Decimal(18, 2)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy      String?   @map("deleted_by") @db.Uuid
+
+  importJob ImportJob @relation(fields: [importJobId, financeSpaceId], references: [id, financeSpaceId], onDelete: NoAction, onUpdate: NoAction, map: "bsb_import_job_fk")
+
+  @@map("bank_statement_balances")
+}
+
+model ExtractedRecord {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  financeSpaceId String       @map("finance_space_id") @db.Uuid
+  importJobId    String       @map("import_job_id") @db.Uuid
+  recordType     String       @map("record_type") @db.VarChar(40)
+  rawData        Json         @default("{}") @map("raw_data")
+  normalizedData Json         @default("{}") @map("normalized_data")
+  confidence     Decimal?     @db.Decimal(5, 4)
+  reviewStatus   ReviewStatus @default(PENDING) @map("review_status")
+  reviewedAt     DateTime?    @map("reviewed_at") @db.Timestamptz(6)
+  reviewedBy     String?      @map("reviewed_by") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy      String?      @map("created_by") @db.Uuid
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy      String?      @map("updated_by") @db.Uuid
+  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  deletedBy      String?      @map("deleted_by") @db.Uuid
+
+  importJob ImportJob                  @relation(fields: [importJobId, financeSpaceId], references: [id, financeSpaceId], onDelete: NoAction, onUpdate: NoAction, map: "extracted_records_job_fk")
+  items     ReceiptItem[]
+  links     ImportedTransactionLink[]
+
+  @@unique([id, financeSpaceId], map: "extracted_records_id_space_uk")
+  @@map("extracted_records")
+}
+
+model ReceiptItem {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  extractedRecordId String    @map("extracted_record_id") @db.Uuid
+  itemName          String    @map("item_name") @db.VarChar(255)
+  quantity          Decimal   @default(1) @db.Decimal(12, 3)
+  unitPrice         Decimal   @default(0) @map("unit_price") @db.Decimal(18, 2)
+  lineTotal         Decimal   @default(0) @map("line_total") @db.Decimal(18, 2)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy         String?   @map("created_by") @db.Uuid
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy         String?   @map("updated_by") @db.Uuid
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy         String?   @map("deleted_by") @db.Uuid
+
+  record ExtractedRecord @relation(fields: [extractedRecordId], references: [id], onDelete: Cascade)
+
+  @@map("receipt_items")
+}
+
+model ImportedTransactionLink {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  financeSpaceId    String    @map("finance_space_id") @db.Uuid
+  importJobId       String    @map("import_job_id") @db.Uuid
+  extractedRecordId String    @map("extracted_record_id") @db.Uuid
+  transactionId     String    @map("transaction_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy         String?   @map("created_by") @db.Uuid
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy         String?   @map("updated_by") @db.Uuid
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy         String?   @map("deleted_by") @db.Uuid
+
+  record ExtractedRecord @relation(fields: [extractedRecordId, financeSpaceId], references: [id, financeSpaceId], onDelete: NoAction, onUpdate: NoAction, map: "itl_extracted_record_fk")
+
+  @@map("imported_transaction_links")
+}
+
+model AuditLog {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  financeSpaceId String?  @map("finance_space_id") @db.Uuid
+  actorId        String?  @map("actor_id") @db.Uuid
+  action         String   @db.VarChar(60)
+  entityType     String   @map("entity_type") @db.VarChar(60)
+  entityId       String?  @map("entity_id") @db.Uuid
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("audit_logs")
+}

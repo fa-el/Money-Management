@@ -1,0 +1,26 @@
+# Database server PostgreSQL untuk development.
+# Saat volume masih kosong, skrip di database/ dijalankan otomatis (urut nama file).
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: money-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-money}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-money_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-money_management}
+      TZ: Asia/Jakarta
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db_data:
