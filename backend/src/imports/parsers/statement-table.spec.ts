@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'bun:test';
 import { parseAmount, parseDate } from './normalize';
 import { parseStatementTable } from './statement-table';
 

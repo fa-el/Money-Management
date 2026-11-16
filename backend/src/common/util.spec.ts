@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'bun:test';
 import { addPeriod, maskAccountNumbers } from './util';
 
 describe('addPeriod', () => {

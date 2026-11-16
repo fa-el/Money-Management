@@ -7,7 +7,8 @@ import { hasRole, type AuthUser } from '../common/types';
 import { addPeriod, localDateString, maskAccountNumbers, paginate, toDateOnly } from '../common/util';
 import { PrismaService } from '../prisma/prisma.service';
 import { localStartOfDay, TransactionsService } from '../transactions/transactions.service';
-import { ClaudeExtractor } from './extractors/claude.extractor';
+import { ClaudeExtractor, type ReceiptExtraction } from './extractors/claude.extractor';
+import { PaddleOcrExtractor } from './extractors/paddle-ocr.extractor';
 import { BulkUpdateRecordsDto, UpdateRecordDto, UploadImportDto } from './imports.dto';
 import { normalizeDescription, parseAmount, parseDate } from './parsers/normalize';
 import { readCsv, readXlsx } from './parsers/spreadsheet';
@@ -81,12 +82,15 @@ export class ImportsService {
     private readonly audit: AuditService,
     private readonly storage: StorageService,
     private readonly extractor: ClaudeExtractor,
+    private readonly ocr: PaddleOcrExtractor,
     private readonly transactions: TransactionsService,
   ) {}
 
   capabilities() {
     return {
-      aiExtraction: this.extractor.enabled,
+      aiExtraction: this.extractor.enabled || this.ocr.enabled,
+      // Mesin pembaca struk: Claude (bila key ada) > PaddleOCR lokal > manual
+      receiptEngine: this.extractor.enabled ? 'claude' : this.ocr.enabled ? 'paddleocr' : null,
       maxUploadMb: MAX_UPLOAD_MB,
       receiptFormats: ['JPG', 'PNG', 'WEBP', 'PDF'],
       statementFormats: this.extractor.enabled ? ['CSV', 'XLSX', 'PDF'] : ['CSV', 'XLSX'],
@@ -380,7 +384,7 @@ export class ImportsService {
       lowConfidenceFields: ['merchant', 'date', 'amount'],
     };
 
-    if (!this.extractor.enabled) {
+    const saveBlank = async (note: string) => {
       await this.prisma.extractedRecord.create({
         data: {
           financeSpaceId: job.financeSpaceId,
@@ -391,10 +395,23 @@ export class ImportsService {
           createdBy: job.createdBy,
         },
       });
-      return 'Pembacaan otomatis tidak aktif. Silakan isi data struk secara manual sambil melihat pratinjau.';
+      return note;
+    };
+
+    let r: ReceiptExtraction;
+    if (this.extractor.enabled) {
+      r = await this.extractor.extractReceipt({ mimeType, data: buffer });
+    } else if (this.ocr.enabled) {
+      try {
+        r = await this.ocr.extractReceipt({ mimeType, data: buffer });
+      } catch (e) {
+        // Struk tetap bisa diisi manual walau OCR gagal/tidak berjalan
+        return saveBlank(`OCR gagal: ${e.message} Silakan isi data struk secara manual.`);
+      }
+    } else {
+      return saveBlank('Pembacaan otomatis tidak aktif. Silakan isi data struk secara manual sambil melihat pratinjau.');
     }
 
-    const r = await this.extractor.extractReceipt({ mimeType, data: buffer });
     const money = (v: number | null) => (v === null || v === undefined ? null : Math.abs(v).toFixed(2));
     const items = r.items.filter((i) => i.name?.trim());
     const total = money(r.total) ?? (items.length ? items.reduce((s, i) => s + i.line_total, 0).toFixed(2) : null);
