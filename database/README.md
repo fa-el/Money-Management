@@ -1,8 +1,8 @@
 # Database — PostgreSQL
 
 Skema database dibuat langsung dengan **SQL murni** dan menjadi sumber kebenaran struktur data.
-Prisma (di `backend/`) hanya membaca skema ini untuk menghasilkan client — **jangan** menjalankan
-`prisma migrate` atau `prisma db push` terhadap database ini.
+Prisma (di `backend/`) hanya membaca skema ini untuk menghasilkan client (`bunx prisma generate`) — **jangan**
+menjalankan `prisma migrate` atau `prisma db push` terhadap database ini.
 
 | File | Isi |
 |---|---|

@@ -15,6 +15,7 @@ import type { ImportJob, Paginated } from "@/lib/types";
 
 interface Capabilities {
   aiExtraction: boolean;
+  receiptEngine: "claude" | "paddleocr" | null;
   maxUploadMb: number;
   receiptFormats: string[];
   statementFormats: string[];
@@ -40,7 +41,13 @@ export default function ImportPage() {
     return () => clearTimeout(t);
   }, [jobs.data, jobs]);
 
-  const accept = sourceType === "RECEIPT" ? ".jpg,.jpeg,.png,.webp,.pdf" : caps.data?.aiExtraction ? ".csv,.xlsx,.pdf" : ".csv,.xlsx";
+  const accept = sourceType === "RECEIPT" ? ".jpg,.jpeg,.png,.webp,.pdf" : caps.data?.statementFormats.includes("PDF") ? ".csv,.xlsx,.pdf" : ".csv,.xlsx";
+  const receiptHint =
+    caps.data?.receiptEngine === "claude"
+      ? "Merchant, tanggal, item & total dibaca otomatis (AI)."
+      : caps.data?.receiptEngine === "paddleocr"
+        ? "Merchant, tanggal, item & total dibaca otomatis dengan OCR lokal (gratis, offline)."
+        : "Isi data struk manual sambil melihat pratinjau.";
 
   const upload = async () => {
     if (!file) return;
@@ -68,7 +75,7 @@ export default function ImportPage() {
           <div className="grid gap-4 md:grid-cols-2">
             {(
               [
-                ["RECEIPT", Receipt, "Struk / Bon", `Foto ${caps.data?.receiptFormats.join(", ") ?? ""}. ${caps.data?.aiExtraction ? "Merchant, tanggal, item & total dibaca otomatis." : "Isi data struk manual sambil melihat pratinjau."}`],
+                ["RECEIPT", Receipt, "Struk / Bon", `Foto ${caps.data?.receiptFormats.join(", ") ?? ""}. ${receiptHint}`],
                 ["E_STATEMENT", FileSpreadsheet, "E-statement / Mutasi", `File ${caps.data?.statementFormats.join(", ") ?? ""} dari internet/mobile banking. Termasuk deteksi duplikasi & rekonsiliasi saldo.`],
               ] as const
             ).map(([value, Icon, title, desc]) => (

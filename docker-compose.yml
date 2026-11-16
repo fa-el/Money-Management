@@ -22,5 +22,18 @@ services:
       timeout: 5s
       retries: 10
 
+  # OCR lokal (PaddleOCR) untuk foto struk — opsional.
+  # Jalankan dengan: docker compose --profile ocr up -d
+  ocr:
+    build: ./ocr-service
+    container_name: money-ocr
+    profiles: ["ocr"]
+    restart: unless-stopped
+    ports:
+      - "${OCR_PORT:-8866}:8866"
+    volumes:
+      - ocr_models:/root/.paddlex   # cache model agar tidak diunduh ulang
+
 volumes:
   db_data:
+  ocr_models:

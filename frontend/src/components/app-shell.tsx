@@ -5,6 +5,7 @@ import { Wallet as WalletIcon } from "lucide-react";
 import {
   ArrowLeftRight,
   BarChart3,
+  BookOpen,
   ChevronsUpDown,
   FileScan,
   LayoutDashboard,
@@ -48,6 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     // Menu Anggota hanya untuk ruang Family/Business
     ...(space.type !== "PERSONAL" ? [{ href: `${base}/members`, label: "Anggota", icon: Users }] : []),
     { href: `${base}/settings`, label: "Pengaturan", icon: Settings },
+    { href: `${base}/guide`, label: "Panduan", icon: BookOpen },
   ];
 
   const sidebar = (

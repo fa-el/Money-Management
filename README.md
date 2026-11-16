@@ -5,7 +5,7 @@ dibangun berdasarkan *Dokumen Perencanaan Aplikasi Pencatatan Keuangan* v1.0 + A
 | Lapisan | Teknologi | Folder |
 |---|---|---|
 | Frontend | Next.js 16 + TypeScript + Tailwind CSS 4 + Recharts | [`frontend/`](frontend/) |
-| Backend | NestJS 11 + TypeScript (REST API, Swagger) | [`backend/`](backend/) |
+| Backend | NestJS 11 + TypeScript di runtime **Bun** (REST API, Swagger) | [`backend/`](backend/) |
 | ORM | Prisma 6 (client saja; skema dari SQL) | [`backend/prisma/`](backend/prisma/) |
 | Database | PostgreSQL 17 — skema dalam SQL murni | [`database/`](database/) |
 
@@ -26,7 +26,7 @@ dibangun berdasarkan *Dokumen Perencanaan Aplikasi Pencatatan Keuangan* v1.0 + A
 
 ## Menjalankan aplikasi (development)
 
-Prasyarat: **Node.js 20+** (diuji dengan 24), **npm**, dan **Docker** (atau PostgreSQL 13+ lokal).
+Prasyarat: **Bun 1.3+** untuk backend, **Node.js 20+ & npm** untuk frontend, dan **Docker** (atau PostgreSQL 13+ lokal).
 
 ### 1. Database
 
@@ -42,10 +42,13 @@ Tanpa Docker atau untuk detail lain, lihat **[database/README.md](database/READM
 ```bash
 cd backend
 cp .env.example .env        # sesuaikan DATABASE_URL bila perlu
-npm install
-npx prisma generate
-npm run start:dev
+bun install
+bunx prisma generate
+bun run dev                 # bun --watch src/main.ts (auto-reload)
 ```
+
+Bun otomatis membaca `.env`. Skema DTO di Swagger dihasilkan oleh plugin Nest saat kompilasi, jadi
+dokumentasi lengkapnya tampil saat menjalankan hasil build (`bun run build && bun run start:prod`).
 
 - API: http://localhost:4000/api
 - Dokumentasi Swagger: http://localhost:4000/api/docs
@@ -70,17 +73,31 @@ File contoh e-statement ada di [`samples/contoh-mutasi-rekening.csv`](samples/co
 Buka **Smart Import → E-statement**, pilih akun "Rekening BCA", unggah file tersebut, lalu periksa hasil
 rekonsiliasi dan peringatan duplikasi sebelum menyetujui.
 
-**Ekstraksi otomatis (opsional).** CSV/XLSX selalu diproses oleh parser bawaan. Untuk membaca **foto struk**
-dan **PDF e-statement** secara otomatis, isi `ANTHROPIC_API_KEY` di `backend/.env`; dokumen akan dikirim ke
-Claude API untuk diekstrak. Tanpa key, struk tetap bisa diunggah dan diisi manual sambil melihat pratinjau,
-dan unggahan PDF e-statement ditolak dengan pesan yang jelas. Apa pun hasilnya, transaksi baru dibuat setelah
-pengguna meninjau dan menyetujuinya.
+**Membaca struk otomatis (opsional).** CSV/XLSX e-statement selalu diproses oleh parser bawaan. Foto struk bisa
+dibaca otomatis dengan salah satu cara berikut (urutan prioritas):
+
+| Mesin | Biaya | Cara mengaktifkan |
+|---|---|---|
+| **Claude API** | berbayar | Isi `ANTHROPIC_API_KEY` di `backend/.env` (juga membaca PDF e-statement). Dokumen dikirim ke Anthropic. |
+| **PaddleOCR lokal** | gratis, offline | Jalankan [`ocr-service/`](ocr-service/README.md) lalu isi `OCR_SERVICE_URL=http://localhost:8866` di `backend/.env`. |
+| Manual | gratis | Tanpa keduanya: struk diisi manual sambil melihat pratinjau. |
+
+Apa pun mesinnya, transaksi baru dibuat setelah pengguna meninjau dan menyetujui hasilnya.
+
+Menjalankan OCR lokal (terminal ke-4, opsional):
+
+```bash
+cd ocr-service
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # sekali saja
+PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True .venv/bin/uvicorn app:app --host 127.0.0.1 --port 8866
+# atau dengan Docker: docker compose --profile ocr up -d
+```
 
 ## Build production
 
 ```bash
-# backend
-cd backend && npm run build && npm run start:prod
+# backend (kompilasi dengan Nest CLI, dijalankan dengan Bun)
+cd backend && bun install --production=false && bun run build && bun run start:prod
 
 # frontend
 cd frontend && npm run build && npm start
@@ -97,7 +114,8 @@ Checklist production (bagian 15 dokumen perencanaan):
 ## Pengujian
 
 ```bash
-cd backend && npm test      # unit test parser mutasi, normalisasi angka/tanggal, penjadwalan
+cd backend && bun test      # unit test parser mutasi & struk OCR, normalisasi angka/tanggal, penjadwalan
+cd backend && bun run lint  # type-check
 ```
 
 Alur API (aturan transaksi, konsistensi saldo setelah edit/void/hapus, isolasi antar-ruang, role, Smart Import,

@@ -639,11 +639,11 @@ function ReceiptReview({
                   setItems(items.map((x, i) => (i === idx ? next : x)));
                 };
                 return (
-                  <div key={idx} className="grid grid-cols-12 gap-2">
-                    <Input className="col-span-5" placeholder="Nama item" value={it.itemName} onChange={(e) => update({ itemName: e.target.value })} />
-                    <Input className="col-span-2" type="number" step="0.001" min="0.001" placeholder="Qty" value={it.quantity} onChange={(e) => update({ quantity: e.target.value })} />
-                    <Input className="col-span-2" type="number" min="0" placeholder="Harga" value={it.unitPrice} onChange={(e) => update({ unitPrice: e.target.value })} />
-                    <Input className="col-span-2" type="number" min="0" placeholder="Total" value={it.lineTotal} onChange={(e) => update({ lineTotal: e.target.value })} />
+                  <div key={idx} className="grid grid-cols-12 gap-2 rounded-lg border border-slate-100 p-2">
+                    <Input className="col-span-12" placeholder="Nama item" value={it.itemName} onChange={(e) => update({ itemName: e.target.value })} />
+                    <Input className="col-span-3 tabular-nums" aria-label="Jumlah" type="number" step="0.001" min="0.001" placeholder="Qty" value={it.quantity} onChange={(e) => update({ quantity: e.target.value })} />
+                    <Input className="col-span-4 tabular-nums" aria-label="Harga satuan" type="number" min="0" placeholder="Harga" value={it.unitPrice} onChange={(e) => update({ unitPrice: e.target.value })} />
+                    <Input className="col-span-4 tabular-nums" aria-label="Total baris" type="number" min="0" placeholder="Total" value={it.lineTotal} onChange={(e) => update({ lineTotal: e.target.value })} />
                     <button type="button" className="col-span-1 text-slate-400 hover:text-rose-600" onClick={() => setItems(items.filter((_, i) => i !== idx))} aria-label="Hapus item">
                       <Trash2 className="mx-auto h-4 w-4" />
                     </button>
